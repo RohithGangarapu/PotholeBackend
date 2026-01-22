@@ -1,0 +1,1489 @@
+openapi: 3.0.3
+info:
+  title: Pothole Detection System API
+  version: 1.0.0
+  description: Comprehensive REST API for Pothole Detection System with Firebase Firestore
+    integration. Manage users, IOT devices, potholes, and alerts with real-time data
+    synchronization.
+paths:
+  /api/alerts/:
+    get:
+      operationId: alerts_list
+      description: List all alerts
+      tags:
+      - Alerts
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alert'
+          description: ''
+    post:
+      operationId: alerts_create
+      description: Create a new alert
+      tags:
+      - Alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+  /api/alerts/{id}/:
+    get:
+      operationId: alerts_retrieve
+      description: Get alert details by ID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Alerts
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+    put:
+      operationId: alerts_update
+      description: Update alert (full)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+    patch:
+      operationId: alerts_partial_update
+      description: Update alert (partial)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Alerts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAlertRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAlertRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAlertRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+    delete:
+      operationId: alerts_destroy
+      description: Delete alert
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Alerts
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/alerts/by-pothole/{pothole_id}/:
+    get:
+      operationId: alerts_by_pothole_retrieve
+      description: Get all alerts for a specific pothole
+      parameters:
+      - in: path
+        name: pothole_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Alerts
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+  /api/alerts/by-type/{type_param}/:
+    get:
+      operationId: alerts_by_type_retrieve
+      description: Filter alerts by type
+      parameters:
+      - in: path
+        name: type
+        schema:
+          type: string
+          enum:
+          - emergency
+          - info
+          - warning
+        required: true
+      - in: path
+        name: type_param
+        schema:
+          type: string
+        required: true
+      tags:
+      - Alerts
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+  /api/alerts/by-user/{user_id}/:
+    get:
+      operationId: alerts_by_user_retrieve
+      description: Get all alerts for a specific user
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Alerts
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alert'
+          description: ''
+  /api/devices/:
+    get:
+      operationId: devices_list
+      description: List all IOT devices
+      tags:
+      - IOT Devices
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IOTDevice'
+          description: ''
+    post:
+      operationId: devices_create
+      description: Register a new IOT device
+      tags:
+      - IOT Devices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IOTDeviceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IOTDeviceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IOTDeviceRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IOTDevice'
+          description: ''
+  /api/devices/{id}/:
+    get:
+      operationId: devices_retrieve
+      description: Get device details by ID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - IOT Devices
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IOTDevice'
+          description: ''
+    put:
+      operationId: devices_update
+      description: Update device (full)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - IOT Devices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IOTDeviceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IOTDeviceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IOTDeviceRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IOTDevice'
+          description: ''
+    patch:
+      operationId: devices_partial_update
+      description: Update device (partial)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - IOT Devices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedIOTDeviceRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedIOTDeviceRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedIOTDeviceRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IOTDevice'
+          description: ''
+    delete:
+      operationId: devices_destroy
+      description: Delete device
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - IOT Devices
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/devices/{id}/update_status/:
+    patch:
+      operationId: devices_update_status_partial_update
+      description: Update device status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - IOT Devices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - inactive
+                  - blocked
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IOTDevice'
+          description: ''
+  /api/devices/by-user/{user_id}/:
+    get:
+      operationId: devices_by_user_retrieve
+      description: Get all devices for a specific user
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - IOT Devices
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IOTDevice'
+          description: ''
+  /api/potholes/:
+    get:
+      operationId: potholes_list
+      description: List all potholes
+      tags:
+      - Potholes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pothole'
+          description: ''
+    post:
+      operationId: potholes_create
+      description: Create a new pothole record
+      tags:
+      - Potholes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PotholeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PotholeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PotholeRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+  /api/potholes/{id}/:
+    get:
+      operationId: potholes_retrieve
+      description: Get pothole details by ID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Potholes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+    put:
+      operationId: potholes_update
+      description: Update pothole (full)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Potholes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PotholeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PotholeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PotholeRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+    patch:
+      operationId: potholes_partial_update
+      description: Update pothole (partial)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Potholes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPotholeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPotholeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPotholeRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+    delete:
+      operationId: potholes_destroy
+      description: Delete pothole
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Potholes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/potholes/by-device/{device_id}/:
+    get:
+      operationId: potholes_by_device_retrieve
+      description: Get all potholes detected by a specific device
+      parameters:
+      - in: path
+        name: device_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Potholes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+  /api/potholes/by-severity/{severity}/:
+    get:
+      operationId: potholes_by_severity_retrieve
+      description: Filter potholes by severity level
+      parameters:
+      - in: path
+        name: severity
+        schema:
+          type: string
+          enum:
+          - high
+          - low
+          - medium
+        required: true
+      tags:
+      - Potholes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+  /api/potholes/by-status/{status_param}/:
+    get:
+      operationId: potholes_by_status_retrieve
+      description: Filter potholes by status
+      parameters:
+      - in: path
+        name: status
+        schema:
+          type: string
+          enum:
+          - fixed
+          - ignored
+          - unresolved
+        required: true
+      - in: path
+        name: status_param
+        schema:
+          type: string
+        required: true
+      tags:
+      - Potholes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+  /api/potholes/upload_image/:
+    post:
+      operationId: potholes_upload_image_create
+      description: Upload an image for a pothole
+      tags:
+      - Potholes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PotholeImageUploadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PotholeImageUploadRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PotholeImageUploadRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pothole'
+          description: ''
+  /api/users/:
+    get:
+      operationId: users_list
+      description: List all users
+      tags:
+      - Users
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+          description: ''
+    post:
+      operationId: users_create
+      description: Create a new user
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/users/{id}/:
+    get:
+      operationId: users_retrieve
+      description: Get user details by ID
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Users
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: users_update
+      description: Update user (full)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      description: Update user (partial)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: users_destroy
+      description: Delete user
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - Users
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    Alert:
+      type: object
+      description: Serializer for Alert model.
+      properties:
+        alert_id:
+          type: string
+          readOnly: true
+        alert_text:
+          type: string
+          description: Alert message content
+        alert_type:
+          allOf:
+          - $ref: '#/components/schemas/AlertTypeEnum'
+          description: |-
+            Type of alert
+
+            * `warning` - Warning
+            * `info` - Info
+            * `emergency` - Emergency
+        alert_time:
+          type: string
+          format: date-time
+          readOnly: true
+        distance:
+          type: number
+          format: double
+          minimum: 0.0
+          description: Distance to pothole in meters
+        pothole_id:
+          type: string
+          description: Associated pothole ID
+          maxLength: 255
+        user_id:
+          type: string
+          description: User receiving the alert
+          maxLength: 255
+      required:
+      - alert_id
+      - alert_text
+      - alert_time
+      - alert_type
+      - distance
+      - pothole_id
+      - user_id
+    AlertRequest:
+      type: object
+      description: Serializer for Alert model.
+      properties:
+        alert_text:
+          type: string
+          minLength: 1
+          description: Alert message content
+        alert_type:
+          allOf:
+          - $ref: '#/components/schemas/AlertTypeEnum'
+          description: |-
+            Type of alert
+
+            * `warning` - Warning
+            * `info` - Info
+            * `emergency` - Emergency
+        distance:
+          type: number
+          format: double
+          minimum: 0.0
+          description: Distance to pothole in meters
+        pothole_id:
+          type: string
+          minLength: 1
+          description: Associated pothole ID
+          maxLength: 255
+        user_id:
+          type: string
+          minLength: 1
+          description: User receiving the alert
+          maxLength: 255
+      required:
+      - alert_text
+      - alert_type
+      - distance
+      - pothole_id
+      - user_id
+    AlertTypeEnum:
+      enum:
+      - warning
+      - info
+      - emergency
+      type: string
+      description: |-
+        * `warning` - Warning
+        * `info` - Info
+        * `emergency` - Emergency
+    IOTDevice:
+      type: object
+      description: Serializer for IOT Device model.
+      properties:
+        device_id:
+          type: string
+          readOnly: true
+        device_type:
+          type: string
+          description: Type of IOT device
+          maxLength: 100
+        mac_id:
+          type: string
+          description: Device MAC address
+          maxLength: 100
+        status:
+          allOf:
+          - $ref: '#/components/schemas/IOTDeviceStatusEnum'
+          description: |-
+            Device status
+
+            * `active` - Active
+            * `inactive` - Inactive
+            * `blocked` - Blocked
+        registered_at:
+          type: string
+          format: date-time
+          readOnly: true
+        registered_by:
+          type: string
+          description: User ID of admin/owner who registered device
+          maxLength: 255
+        user_id:
+          type: string
+          description: User ID of device owner
+          maxLength: 255
+      required:
+      - device_id
+      - device_type
+      - mac_id
+      - registered_at
+      - registered_by
+      - user_id
+    IOTDeviceRequest:
+      type: object
+      description: Serializer for IOT Device model.
+      properties:
+        device_type:
+          type: string
+          minLength: 1
+          description: Type of IOT device
+          maxLength: 100
+        mac_id:
+          type: string
+          minLength: 1
+          description: Device MAC address
+          maxLength: 100
+        status:
+          allOf:
+          - $ref: '#/components/schemas/IOTDeviceStatusEnum'
+          description: |-
+            Device status
+
+            * `active` - Active
+            * `inactive` - Inactive
+            * `blocked` - Blocked
+        registered_by:
+          type: string
+          minLength: 1
+          description: User ID of admin/owner who registered device
+          maxLength: 255
+        user_id:
+          type: string
+          minLength: 1
+          description: User ID of device owner
+          maxLength: 255
+      required:
+      - device_type
+      - mac_id
+      - registered_by
+      - user_id
+    IOTDeviceStatusEnum:
+      enum:
+      - active
+      - inactive
+      - blocked
+      type: string
+      description: |-
+        * `active` - Active
+        * `inactive` - Inactive
+        * `blocked` - Blocked
+    Location:
+      type: object
+      description: Nested serializer for location data.
+      properties:
+        latitude:
+          type: number
+          format: double
+          maximum: 90.0
+          minimum: -90.0
+        longitude:
+          type: number
+          format: double
+          maximum: 180.0
+          minimum: -180.0
+        address:
+          type: string
+          maxLength: 500
+      required:
+      - latitude
+      - longitude
+    LocationRequest:
+      type: object
+      description: Nested serializer for location data.
+      properties:
+        latitude:
+          type: number
+          format: double
+          maximum: 90.0
+          minimum: -90.0
+        longitude:
+          type: number
+          format: double
+          maximum: 180.0
+          minimum: -180.0
+        address:
+          type: string
+          maxLength: 500
+      required:
+      - latitude
+      - longitude
+    PatchedAlertRequest:
+      type: object
+      description: Serializer for Alert model.
+      properties:
+        alert_text:
+          type: string
+          minLength: 1
+          description: Alert message content
+        alert_type:
+          allOf:
+          - $ref: '#/components/schemas/AlertTypeEnum'
+          description: |-
+            Type of alert
+
+            * `warning` - Warning
+            * `info` - Info
+            * `emergency` - Emergency
+        distance:
+          type: number
+          format: double
+          minimum: 0.0
+          description: Distance to pothole in meters
+        pothole_id:
+          type: string
+          minLength: 1
+          description: Associated pothole ID
+          maxLength: 255
+        user_id:
+          type: string
+          minLength: 1
+          description: User receiving the alert
+          maxLength: 255
+    PatchedIOTDeviceRequest:
+      type: object
+      description: Serializer for IOT Device model.
+      properties:
+        device_type:
+          type: string
+          minLength: 1
+          description: Type of IOT device
+          maxLength: 100
+        mac_id:
+          type: string
+          minLength: 1
+          description: Device MAC address
+          maxLength: 100
+        status:
+          allOf:
+          - $ref: '#/components/schemas/IOTDeviceStatusEnum'
+          description: |-
+            Device status
+
+            * `active` - Active
+            * `inactive` - Inactive
+            * `blocked` - Blocked
+        registered_by:
+          type: string
+          minLength: 1
+          description: User ID of admin/owner who registered device
+          maxLength: 255
+        user_id:
+          type: string
+          minLength: 1
+          description: User ID of device owner
+          maxLength: 255
+    PatchedPotholeRequest:
+      type: object
+      description: Serializer for Pothole model.
+      properties:
+        device_id:
+          type: string
+          minLength: 1
+          description: Device that detected the pothole
+          maxLength: 255
+        user_id:
+          type: string
+          minLength: 1
+          description: User associated with detection
+          maxLength: 255
+        depth:
+          type: number
+          format: double
+          minimum: 0.0
+          description: Pothole depth in cm
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/SeverityEnum'
+          description: |-
+            Severity level
+
+            * `low` - Low
+            * `medium` - Medium
+            * `high` - High
+        image_url:
+          type: string
+          format: uri
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PotholeStatusEnum'
+          description: |-
+            Resolution status
+
+            * `unresolved` - Unresolved
+            * `fixed` - Fixed
+            * `ignored` - Ignored
+        latitude:
+          type: number
+          format: double
+          maximum: 90.0
+          minimum: -90.0
+          description: Latitude coordinate
+        longitude:
+          type: number
+          format: double
+          maximum: 180.0
+          minimum: -180.0
+          description: Longitude coordinate
+        address:
+          type: string
+          nullable: true
+          description: Human-readable address
+          maxLength: 500
+        location:
+          allOf:
+          - $ref: '#/components/schemas/LocationRequest'
+          writeOnly: true
+    PatchedUserRequest:
+      type: object
+      description: Serializer for User model.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: User's display name
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address
+          maxLength: 254
+        phone:
+          type: string
+          minLength: 1
+          description: User's phone number
+          maxLength: 20
+    Pothole:
+      type: object
+      description: Serializer for Pothole model.
+      properties:
+        pothole_id:
+          type: string
+          readOnly: true
+        device_id:
+          type: string
+          description: Device that detected the pothole
+          maxLength: 255
+        user_id:
+          type: string
+          description: User associated with detection
+          maxLength: 255
+        depth:
+          type: number
+          format: double
+          minimum: 0.0
+          description: Pothole depth in cm
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/SeverityEnum'
+          description: |-
+            Severity level
+
+            * `low` - Low
+            * `medium` - Medium
+            * `high` - High
+        image_url:
+          type: string
+          format: uri
+        detected_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PotholeStatusEnum'
+          description: |-
+            Resolution status
+
+            * `unresolved` - Unresolved
+            * `fixed` - Fixed
+            * `ignored` - Ignored
+        latitude:
+          type: number
+          format: double
+          maximum: 90.0
+          minimum: -90.0
+          description: Latitude coordinate
+        longitude:
+          type: number
+          format: double
+          maximum: 180.0
+          minimum: -180.0
+          description: Longitude coordinate
+        address:
+          type: string
+          nullable: true
+          description: Human-readable address
+          maxLength: 500
+      required:
+      - depth
+      - detected_at
+      - device_id
+      - latitude
+      - longitude
+      - pothole_id
+      - severity
+      - user_id
+    PotholeImageUploadRequest:
+      type: object
+      description: Serializer for pothole image upload.
+      properties:
+        pothole_id:
+          type: string
+          minLength: 1
+        image:
+          type: string
+          format: binary
+      required:
+      - image
+      - pothole_id
+    PotholeRequest:
+      type: object
+      description: Serializer for Pothole model.
+      properties:
+        device_id:
+          type: string
+          minLength: 1
+          description: Device that detected the pothole
+          maxLength: 255
+        user_id:
+          type: string
+          minLength: 1
+          description: User associated with detection
+          maxLength: 255
+        depth:
+          type: number
+          format: double
+          minimum: 0.0
+          description: Pothole depth in cm
+        severity:
+          allOf:
+          - $ref: '#/components/schemas/SeverityEnum'
+          description: |-
+            Severity level
+
+            * `low` - Low
+            * `medium` - Medium
+            * `high` - High
+        image_url:
+          type: string
+          format: uri
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PotholeStatusEnum'
+          description: |-
+            Resolution status
+
+            * `unresolved` - Unresolved
+            * `fixed` - Fixed
+            * `ignored` - Ignored
+        latitude:
+          type: number
+          format: double
+          maximum: 90.0
+          minimum: -90.0
+          description: Latitude coordinate
+        longitude:
+          type: number
+          format: double
+          maximum: 180.0
+          minimum: -180.0
+          description: Longitude coordinate
+        address:
+          type: string
+          nullable: true
+          description: Human-readable address
+          maxLength: 500
+        location:
+          allOf:
+          - $ref: '#/components/schemas/LocationRequest'
+          writeOnly: true
+      required:
+      - depth
+      - device_id
+      - latitude
+      - longitude
+      - severity
+      - user_id
+    PotholeStatusEnum:
+      enum:
+      - unresolved
+      - fixed
+      - ignored
+      type: string
+      description: |-
+        * `unresolved` - Unresolved
+        * `fixed` - Fixed
+        * `ignored` - Ignored
+    SeverityEnum:
+      enum:
+      - low
+      - medium
+      - high
+      type: string
+      description: |-
+        * `low` - Low
+        * `medium` - Medium
+        * `high` - High
+    User:
+      type: object
+      description: Serializer for User model.
+      properties:
+        user_id:
+          type: string
+          readOnly: true
+        username:
+          type: string
+          description: User's display name
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          description: User's email address
+          maxLength: 254
+        phone:
+          type: string
+          description: User's phone number
+          maxLength: 20
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - phone
+      - user_id
+      - username
+    UserRequest:
+      type: object
+      description: Serializer for User model.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: User's display name
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: User's email address
+          maxLength: 254
+        phone:
+          type: string
+          minLength: 1
+          description: User's phone number
+          maxLength: 20
+      required:
+      - email
+      - phone
+      - username
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+tags:
+- name: Users
+  description: User management operations
+- name: IOT Devices
+  description: IOT device registration and management
+- name: Potholes
+  description: Pothole detection and tracking
+- name: Alerts
+  description: Alert notification system
