@@ -1,90 +1,125 @@
 import cv2
 import numpy as np
-from gradio_client import Client, handle_file
 import os
+import requests
+import json
+import time
+import uuid
 
 class PotholeDetector:
     def __init__(self):
-        # Initialize Gradio Client pointing to your Space
-        self.space_id = "RohithGangarapu/PotholeYolov8"
+        self.space_id = "RohithGangarapu/PotholeYoloV8-NEW"
+        self.space_url = "https://rohithgangarapu-potholeyolov8-new.hf.space"
+        self.upload_url = f"{self.space_url}/gradio_api/upload"
+        self.call_url = f"{self.space_url}/gradio_api/call/predict"
+
+    def _upload_file(self, file_path):
+        """Uploads a local file to Gradio's temp storage and returns the remote path."""
         try:
-            self.client = Client(self.space_id)
-            print(f"Connected to Hugging Face Space: {self.space_id}")
+            with open(file_path, "rb") as f:
+                files = {"files": (os.path.basename(file_path), f)}
+                response = requests.post(self.upload_url, files=files, timeout=30)
+                if response.status_code == 200:
+                    return response.json()[0]
         except Exception as e:
-            self.client = None
-            print(f"Error connecting to Space: {str(e)}")
+            print(f"File upload failed: {e}")
+        return None
 
     def detect(self, image_path):
         """
-        Runs remote detection, draws annotations on the image, and returns 
-        (list of detections, annotated_image_bytes).
+        Runs remote detection using raw HTTP/SSE requests (bypassing gradio_client).
+        Returns (list of detections, annotated_image_bytes).
         """
-        if self.client is None:
-            print("Gradio Client not initialized, skipping detection.")
-            return [], None
-
         try:
-            # Call the predict endpoint
-            # Based on your app.py, the predict function takes an image and returns JSON
-            result = self.client.predict(
-                image=handle_file(image_path),
-                api_name="/predict"
-            )
+            # 1. Upload file if it's local
+            print(f"Preparing image for remote detection...")
+            remote_path = self._upload_file(image_path)
+            if not remote_path:
+                print("Failed to upload image to remote API.")
+                return [], None
+
+            # 2. Create Inference Task
+            print("Creating inference task on Hugging Face...")
+            payload = {"data": [{"path": remote_path}]}
+            response = requests.post(self.call_url, json=payload, timeout=15)
             
-            # The result from your app.py is boxes.data.tolist() which is a list of lists:
-            # [x1, y1, x2, y2, confidence, class_id]
-            detections_data = result if isinstance(result, list) else []
+            if response.status_code != 200:
+                print(f"Failed to create task: {response.text}")
+                return [], None
+
+            event_id = response.json().get("event_id")
+            result_url = f"{self.call_url}/{event_id}"
+
+            # 3. Listen for SSE Result
+            print(f"Waiting for AI result (Event: {event_id})...")
+            detections_data = []
             
-            detections = []
+            # We poll until we get the 'complete' event or timeout
+            with requests.get(result_url, stream=True, timeout=60) as r:
+                current_event = None
+                for line in r.iter_lines():
+                    if not line: continue
+                    decoded = line.decode('utf-8')
+                    
+                    if decoded.startswith("event:"):
+                        current_event = decoded.replace("event:", "").strip()
+                    elif decoded.startswith("data:"):
+                        data_str = decoded.replace("data:", "").strip()
+                        
+                        if current_event == "complete":
+                            data = json.loads(data_str)
+                            if isinstance(data, list) and len(data) >= 2:
+                                detections_data = data[1] # [annotated_image, detections_list]
+                            break
+                        elif current_event == "error":
+                            print(f"Remote AI Error: {data_str}")
+                            return [], None
+
+            # 4. Local Annotation
+            print(f"Processing {len(detections_data)} remote detections...")
             img = cv2.imread(image_path)
+            if img is None:
+                return [], None
+            
             img_h, img_w, _ = img.shape
+            detections = []
 
             for box_data in detections_data:
-                if len(box_data) < 6: continue
+                # Expecting [x1, y1, x2, y2, confidence, class_id]
+                if not isinstance(box_data, list) or len(box_data) < 6:
+                    continue
                 
                 x1, y1, x2, y2, conf, cls_id = box_data
                 
-                # Heuristics for depth
-                width = x2 - x1
-                height = y2 - y1
-                area = width * height
-                rel_area = area / (img_h * img_w)
-                
-                # Depth Heuristic: rel_area * coefficient
+                # Heuristics for depth & severity
+                rel_area = ((x2 - x1) * (y2 - y1)) / (img_h * img_w)
                 depth = round(rel_area * 50, 2)
                 
-                # Severity mapping based on depth
                 if depth > 15:
-                    severity = 'high'
-                    color = (0, 0, 255) # Red
+                    severity, color = 'high', (0, 0, 255)
                 elif depth > 5:
-                    severity = 'medium'
-                    color = (0, 165, 255) # Orange
+                    severity, color = 'medium', (0, 165, 255)
                 else:
-                    severity = 'low'
-                    color = (0, 255, 0) # Green
+                    severity, color = 'low', (0, 255, 0)
                 
-                # Annotation: Draw Bounding Box
+                # Draw on image
                 cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
-                
-                # Annotation: Draw Label (Pothole + Depth)
-                label = f"Pothole: {depth}cm"
-                cv2.putText(img, label, (int(x1), int(y1) - 10), 
+                cv2.putText(img, f"Pothole: {depth}cm", (int(x1), int(y1) - 10), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
                 
                 detections.append({
-                    'bbox': [x1, y1, x2, y2],
+                    'bbox': [float(x1), float(y1), float(x2), float(y2)],
                     'confidence': float(conf),
                     'severity': severity,
-                    'depth': depth,
+                    'depth': float(depth),
                 })
-            
-            # Convert annotated image back to bytes for Django
+
+            # Encode annotated image
             success, buffer = cv2.imencode('.jpg', img)
             annotated_image_bytes = buffer.tobytes() if success else None
             
             return detections, annotated_image_bytes
 
         except Exception as e:
-            print(f"Remote detection failed: {str(e)}")
+            print(f"Detector error: {str(e)}")
             return [], None
