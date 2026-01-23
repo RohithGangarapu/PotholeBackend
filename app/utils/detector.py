@@ -1,21 +1,32 @@
 import os
 import cv2
+from huggingface_hub import hf_hub_download
 from ultralytics import YOLO
 
 class PotholeDetector:
     def __init__(self, model_path=None):
         if model_path is None:
-            # Look for best.pt in the ml_models directory
-            model_path = os.path.join(os.path.dirname(__file__), '..', 'ml_models', 'best.pt')
+            # Download the model from HF Hub
+            try:
+                print("Downloading model from Hugging Face Hub...")
+                model_path = hf_hub_download(
+                    repo_id="RohithGangarapu/PotholeYolov8",
+                    filename="best.pt"
+                )
+                print(f"Model downloaded to {model_path}")
+            except Exception as e:
+                print(f"Error downloading model from HF Hub: {str(e)}")
+                # Fallback to local if download fails
+                model_path = os.path.join(os.path.dirname(__file__), '..', 'ml_models', 'best.pt')
         
         self.model_path = model_path
         self.model = None
         
-        if os.path.exists(model_path):
+        if model_path and os.path.exists(model_path):
             self.model = YOLO(model_path)
             print(f"Pothole model loaded from {model_path}")
         else:
-            print(f"Warning: Pothole model not found at {model_path}")
+            print(f"Warning: Pothole model not found or failed to load.")
 
     def detect(self, image_path):
         """

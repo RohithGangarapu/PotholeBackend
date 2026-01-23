@@ -86,23 +86,23 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 
-import dj_database_url
+# import dj_database_url
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.environ.get("DATABASE_URL")
-    )
-}
 # DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'pothole_db',
-#         'USER': 'postgres',
-#         'PASSWORD': 'rohith',
-#         'HOST': 'localhost',
-#         'PORT': '5432',
-#     }
+#     "default": dj_database_url.config(
+#         default=os.environ.get("DATABASE_URL")
+#     )
 # }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'pothole_db',
+        'USER': 'postgres',
+        'PASSWORD': 'rohith',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
 # Fallback for local development if DATABASE_URL is not provided or fails
 # You can also manually define it if you prefer:
 # DATABASES = {

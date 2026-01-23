@@ -60,3 +60,4 @@ uritemplate==4.2.0
 urllib3==2.6.3
 whitenoise==6.11.0
 ultralytics==8.3.0
+huggingface-hub==0.23.0
