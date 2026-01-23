@@ -1,0 +1,2 @@
+[phases.build]
+nixPkgs = ["libxcb", "libxcb-randr", "libxcb-xtest", "libxcb-xinerama", "libxcb-shape", "libxcb-xkb", "libgl"]
