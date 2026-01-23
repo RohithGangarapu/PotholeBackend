@@ -42,6 +42,7 @@ proto-plus==1.27.0
 protobuf==6.33.2
 psycopg2==2.9.11
 psycopg2-binary==2.9.11
+psycopg[binary]
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pycparser==2.23
@@ -59,5 +60,6 @@ typing_extensions==4.15.0
 uritemplate==4.2.0
 urllib3==2.6.3
 whitenoise==6.11.0
+opencv-python
 opencv-python-headless
 numpy
