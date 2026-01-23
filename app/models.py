@@ -120,22 +120,5 @@ class Alert(models.Model):
     def __str__(self):
         return f"{self.alert_type.upper()} Alert for User {self.user_id}"
 
-class PotholeImage(models.Model):
-    """
-    Model to store uploaded images and their metadata from the upload-image API.
-    """
-    image = models.ImageField(upload_to='pothole_uploads/', help_text="Uploaded pothole image")
-    latitude = models.FloatField(blank=True, null=True, help_text="Latitude at time of upload")
-    longitude = models.FloatField(blank=True, null=True, help_text="Longitude at time of upload")
-    device = models.ForeignKey(IOTDevice, on_delete=models.SET_NULL, null=True, blank=True, related_name='uploaded_images', help_text="Device that uploaded the image")
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='uploaded_images', help_text="User who uploaded the image")
-    uploaded_at = models.DateTimeField(auto_now_add=True, help_text="Upload timestamp")
-
-    class Meta:
-        db_table = 'pothole_images'
-        verbose_name = 'Pothole Image'
-        verbose_name_plural = 'Pothole Images'
-        ordering = ['-uploaded_at']
-
     def __str__(self):
-        return f"Image {self.id} uploaded at {self.uploaded_at}"
+        return f"{self.alert_type.upper()} Alert for User {self.user_id}"

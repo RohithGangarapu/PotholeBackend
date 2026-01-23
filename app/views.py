@@ -11,11 +11,15 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from datetime import datetime
 
-from .models import User, IOTDevice, Pothole, Alert, PotholeImage
+from .models import User, IOTDevice, Pothole, Alert
 from .serializers import (
     UserSerializer, IOTDeviceSerializer, PotholeSerializer, 
-    AlertSerializer, QuickPotholeUploadSerializer, PotholeImageSerializer
+    AlertSerializer, QuickPotholeUploadSerializer
 )
+from .utils.detector import PotholeDetector
+
+# Initialize detector
+detector = PotholeDetector()
 
 
 @extend_schema_view(
@@ -183,43 +187,78 @@ class PotholeViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['post'], url_path='upload-image')
     def upload_image(self, request):
-        """Upload image for pothole detection (creates PotholeImage record)"""
-        # Merge query params into data for validation if they exist
+        """Upload image and directly create Pothole records if detected"""
         data = request.data.copy()
-        
         latitude = request.query_params.get('latitude')
         longitude = request.query_params.get('longitude')
         
-        if latitude:
-            data['latitude'] = latitude
-        if longitude:
-            data['longitude'] = longitude
+        if latitude: data['latitude'] = latitude
+        if longitude: data['longitude'] = longitude
             
         serializer = QuickPotholeUploadSerializer(data=data)
         if serializer.is_valid():
             validated_data = serializer.validated_data
+            photo = validated_data['photo']
             
             try:
-                # Create PotholeImage record
-                pothole_image = PotholeImage.objects.create(
-                    device=validated_data.get('deviceId'),
-                    user=validated_data.get('userId'),
-                    latitude=validated_data.get('latitude', 0.0),
-                    longitude=validated_data.get('longitude', 0.0),
-                    image=validated_data['photo']
-                )
+                # --- YOLO Pothole Detection Logic ---
+                # Save photo temporarily for detector to read
+                from django.core.files.storage import default_storage
+                from django.core.files.base import ContentFile
+                import os
+                import uuid
+
+                temp_filename = f"temp_{uuid.uuid4()}.jpg"
+                temp_path = default_storage.save(f"tmp/{temp_filename}", ContentFile(photo.read()))
+                full_temp_path = default_storage.path(temp_path)
                 
-                response_serializer = PotholeImageSerializer(pothole_image)
+                # Run detection
+                try:
+                    detections, annotated_image_bytes = detector.detect(full_temp_path)
+                finally:
+                    # Always clean up temp file
+                    if os.path.exists(full_temp_path):
+                        os.remove(full_temp_path)
+                
+                pothole_records = []
+                if detections:
+                    # User only wants to store if detection occurs
+                    for det in detections:
+                        # Prepare the annotated image for saving
+                        pothole_image = photo
+                        if annotated_image_bytes:
+                            pothole_image = ContentFile(annotated_image_bytes, name=photo.name)
+                        
+                        pothole = Pothole.objects.create(
+                            device=validated_data.get('deviceId'),
+                            user=validated_data.get('userId'),
+                            depth=det['depth'],
+                            severity=det['severity'],
+                            image=pothole_image, # Store the annotated image
+                            latitude=validated_data.get('latitude', 0.0),
+                            longitude=validated_data.get('longitude', 0.0),
+                            status='unresolved'
+                        )
+                        pothole_records.append(PotholeSerializer(pothole).data)
+                    
+                    return Response({
+                        "status": "success",
+                        "message": f"Detection complete. {len(detections)} pothole(s) found and recorded.",
+                        "detection_count": len(detections),
+                        "potholes": pothole_records
+                    }, status=status.HTTP_201_CREATED)
+                
                 return Response({
                     "status": "success",
-                    "message": "Image uploaded successfully and stored in db",
-                    "data": response_serializer.data
-                }, status=status.HTTP_201_CREATED)
+                    "message": "Detection complete. No potholes found. No record created.",
+                    "detection_count": 0,
+                    "potholes": []
+                }, status=status.HTTP_200_OK)
                 
             except Exception as e:
                 return Response({
                     "status": "error",
-                    "message": f"Upload failed: {str(e)}"
+                    "message": f"Detection process failed: {str(e)}"
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response({

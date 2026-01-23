@@ -6,7 +6,7 @@ using standard Django models.
 """
 
 from rest_framework import serializers
-from .models import User, IOTDevice, Pothole, Alert, PotholeImage
+from .models import User, IOTDevice, Pothole, Alert
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -201,26 +201,6 @@ class AlertSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("Distance must be a positive number")
         return value
-class PotholeImageSerializer(serializers.ModelSerializer):
-    """
-    Serializer for PotholeImage model.
-    """
-    class Meta:
-        model = PotholeImage
-        fields = ['id', 'image', 'latitude', 'longitude', 'device', 'user', 'uploaded_at']
-        read_only_fields = ['id', 'uploaded_at']
-    
-    def validate_image(self, value):
-        """Validate image file"""
-        # Check file size (max 5MB)
-        if value.size > 5 * 1024 * 1024:
-            raise serializers.ValidationError("Image file size must be less than 5MB")
-        
-        # Check file type
-        valid_types = ['image/jpeg', 'image/jpg', 'image/png']
-        if value.content_type not in valid_types:
-            raise serializers.ValidationError("Only JPEG and PNG images are allowed")
-        
         return value
 
 

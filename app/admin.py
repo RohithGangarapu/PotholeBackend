@@ -6,7 +6,7 @@ users, devices, potholes, and alerts.
 """
 
 from django.contrib import admin
-from .models import User, IOTDevice, Pothole, Alert, PotholeImage
+from .models import User, IOTDevice, Pothole, Alert
 
 
 @admin.register(User)
@@ -110,31 +110,3 @@ class AlertAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-
-
-@admin.register(PotholeImage)
-class PotholeImageAdmin(admin.ModelAdmin):
-    """
-    Admin configuration for PotholeImage model.
-    """
-    list_display = ['id', 'image', 'latitude', 'longitude', 'device', 'user', 'uploaded_at']
-    list_filter = ['uploaded_at', 'device', 'user']
-    search_fields = ['id']
-    readonly_fields = ['id', 'uploaded_at']
-    
-    fieldsets = (
-        ('Image Data', {
-            'fields': ('image', 'id')
-        }),
-        ('Location Metadata', {
-            'fields': ('latitude', 'longitude')
-        }),
-        ('User & Device', {
-            'fields': ('user', 'device')
-        }),
-        ('Timestamps', {
-            'fields': ('uploaded_at',),
-            'classes': ('collapse',)
-        }),
-    )
-
