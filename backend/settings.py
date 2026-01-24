@@ -14,6 +14,7 @@ from pathlib import Path
 from decouple import config
 import os
 import dj_database_url
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -86,14 +87,16 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 
-import dj_database_url
-
 # Database setup: prefer DATABASE_URL if available (Production/Railway)
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = config('DATABASE_URL', default=None)
 
 if DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.config(default=DATABASE_URL)
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
 else:
     DATABASES = {
@@ -104,7 +107,7 @@ else:
             'PASSWORD': config('DB_PASSWORD', default='rohith'),
             'HOST': os.getenv('DB_HOST', config('DB_HOST', default='localhost')),
             'PORT': config('DB_PORT', default='5432'),
-        }
+        }ƒ
     }
 # Fallback for local development if DATABASE_URL is not provided or fails
 # You can also manually define it if you prefer:
@@ -212,6 +215,12 @@ CORS_ALLOWED_ORIGINS = config(
 ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Required for Railway domains
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS', 
+    default='http://localhost:3000,http://127.0.0.1:3000'
+).split(',')
 
 CORS_ALLOW_METHODS = [
     'DELETE',
