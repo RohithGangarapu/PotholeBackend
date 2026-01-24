@@ -206,6 +206,7 @@ SPECTACULAR_SETTINGS = {
     'COMPONENT_SPLIT_REQUEST': True,
     'SCHEMA_PATH_PREFIX': '/api/',
     'TAGS': [
+        {'name': 'Authentication', 'description': 'User authentication and login'},
         {'name': 'Users', 'description': 'User management operations'},
         {'name': 'IOT Devices', 'description': 'IOT device registration and management'},
         {'name': 'Potholes', 'description': 'Pothole detection and tracking'},

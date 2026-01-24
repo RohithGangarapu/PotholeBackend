@@ -110,3 +110,26 @@ class AlertAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+# Custom Admin for API Visibility
+class LoginAPI(User):
+    """
+    Proxy model to provide a link to the Login API in the admin panel.
+    """
+    class Meta:
+        proxy = True
+        verbose_name = 'Login API (Swagger)'
+        verbose_name_plural = 'Login API (Swagger)'
+
+@admin.register(LoginAPI)
+class LoginAPIAdmin(admin.ModelAdmin):
+    """
+    Admin configuration that redirects to Swagger documentation.
+    """
+    def has_add_permission(self, request): return False
+    def has_delete_permission(self, request, obj=None): return False
+    def has_change_permission(self, request, obj=None): return False
+    
+    def changelist_view(self, request, extra_context=None):
+        from django.http import HttpResponseRedirect
+        return HttpResponseRedirect('/api/v1/docs/')
