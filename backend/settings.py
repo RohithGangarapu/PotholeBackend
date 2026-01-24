@@ -107,7 +107,7 @@ else:
             'PASSWORD': config('DB_PASSWORD', default='rohith'),
             'HOST': os.getenv('DB_HOST', config('DB_HOST', default='localhost')),
             'PORT': config('DB_PORT', default='5432'),
-        }ƒ
+        }
     }
 # Fallback for local development if DATABASE_URL is not provided or fails
 # You can also manually define it if you prefer:
