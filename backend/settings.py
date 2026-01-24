@@ -88,7 +88,8 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 
 # Database setup: prefer DATABASE_URL if available (Production/Railway)
-DATABASE_URL = config('DATABASE_URL', default=None)
+# We check os.getenv first to ensure Docker/Railway environment variables take absolute priority
+DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL:
     DATABASES = {
@@ -96,16 +97,20 @@ if DATABASE_URL:
             default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
+            ssl_require=True if not 'localhost' in DATABASE_URL and not '127.0.0.1' in DATABASE_URL else False
         )
     }
 else:
+    # Fallback to individual components (Local/Docker)
+    DB_HOST = os.getenv('DB_HOST', config('DB_HOST', default='localhost'))
+    
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': config('DB_NAME', default='pothole_db'),
             'USER': config('DB_USER', default='postgres'),
             'PASSWORD': config('DB_PASSWORD', default='rohith'),
-            'HOST': os.getenv('DB_HOST', config('DB_HOST', default='localhost')),
+            'HOST': DB_HOST,
             'PORT': config('DB_PORT', default='5432'),
         }
     }

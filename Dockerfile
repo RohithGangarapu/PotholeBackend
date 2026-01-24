@@ -29,5 +29,5 @@ COPY . .
 # Expose port (Railway uses the PORT env var)
 EXPOSE 8000
 
-# Production command using Gunicorn
-CMD ["sh", "-c", "gunicorn backend.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
+# Production command: Run migrations then start Gunicorn
+CMD ["sh", "-c", "python manage.py migrate && gunicorn backend.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
