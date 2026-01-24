@@ -227,6 +227,13 @@ CSRF_TRUSTED_ORIGINS = config(
     default='http://localhost:3000,http://127.0.0.1:3000'
 ).split(',')
 
+# Automatically add Railway domain if it exists
+RAILWAY_DOMAIN = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+if RAILWAY_DOMAIN:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RAILWAY_DOMAIN}')
+    # Add the specific URL from the error message just in case
+    CSRF_TRUSTED_ORIGINS.append('https://potholebackend-production.up.railway.app')
+
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
