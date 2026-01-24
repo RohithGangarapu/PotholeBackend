@@ -6,15 +6,17 @@ using standard Django models and PostgreSQL.
 """
 
 from rest_framework import viewsets, status
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.contrib.auth.hashers import check_password
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from datetime import datetime
 
 from .models import User, IOTDevice, Pothole, Alert
 from .serializers import (
     UserSerializer, IOTDeviceSerializer, PotholeSerializer, 
-    AlertSerializer, QuickPotholeUploadSerializer
+    AlertSerializer, QuickPotholeUploadSerializer, LoginSerializer
 )
 from .utils.detector import PotholeDetector
 
@@ -335,3 +337,49 @@ class AlertViewSet(viewsets.ModelViewSet):
             "data": serializer.data
         })
 
+class LoginView(APIView):
+    """
+    API View for user login.
+    """
+    @extend_schema(
+        description="Authenticate user with email and password",
+        tags=['Authentication'],
+        request=LoginSerializer,
+        responses={
+            200: {"type": "object", "properties": {"status": {"type": "string"}, "message": {"type": "string"}, "user": {"$ref": "#/components/schemas/User"}}},
+            401: {"type": "object", "properties": {"status": {"type": "string"}, "message": {"type": "string"}}},
+            404: {"type": "object", "properties": {"status": {"type": "string"}, "message": {"type": "string"}}},
+        }
+    )
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
+            
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response({
+                    "status": "error",
+                    "message": "User with this email does not exist"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            if check_password(password, user.password):
+                user_serializer = UserSerializer(user)
+                return Response({
+                    "status": "success",
+                    "message": "Login successful",
+                    "user": user_serializer.data
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "status": "error",
+                    "message": "Invalid password"
+                }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        return Response({
+            "status": "error",
+            "message": "Validation failed",
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)

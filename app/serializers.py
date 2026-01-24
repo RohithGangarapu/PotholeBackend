@@ -229,3 +229,10 @@ class QuickPotholeUploadSerializer(serializers.Serializer):
         
         return value
 
+
+class LoginSerializer(serializers.Serializer):
+    """
+    Serializer for user login.
+    """
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, style={'input_type': 'password'})

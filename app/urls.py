@@ -6,7 +6,7 @@ This module defines all API routes using Django REST Framework routers.
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import UserViewSet, IOTDeviceViewSet, PotholeViewSet, AlertViewSet
+from .views import UserViewSet, IOTDeviceViewSet, PotholeViewSet, AlertViewSet, LoginView
 
 # Create router and register ViewSets
 router = DefaultRouter()
@@ -17,5 +17,6 @@ router.register(r'alerts', AlertViewSet, basename='alert')
 
 # URL patterns
 urlpatterns = [
+    path('login/', LoginView.as_view(), name='login'),
     path('', include(router.urls)),
 ]
