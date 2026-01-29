@@ -176,14 +176,15 @@ class AlertSerializer(serializers.ModelSerializer):
     alertText = serializers.CharField(source='alert_text')
     alertType = serializers.CharField(source='alert_type')
     alertTime = serializers.DateTimeField(source='alert_time', read_only=True)
-    potholeId = serializers.PrimaryKeyRelatedField(source='pothole', queryset=Pothole.objects.all())
+    pothole = PotholeSerializer(read_only=True)
+    potholeId = serializers.PrimaryKeyRelatedField(source='pothole', queryset=Pothole.objects.all(), write_only=True)
     userId = serializers.PrimaryKeyRelatedField(source='user', queryset=User.objects.all())
     
     class Meta:
         model = Alert
         fields = [
             'id', 'alertText', 'alertType', 'alertTime',
-            'distance', 'potholeId', 'userId'
+            'distance', 'pothole', 'potholeId', 'userId'
         ]
         read_only_fields = ['id', 'alertTime']
     

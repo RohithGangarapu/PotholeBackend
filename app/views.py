@@ -19,6 +19,8 @@ from .serializers import (
     AlertSerializer, QuickPotholeUploadSerializer, LoginSerializer
 )
 from .utils.detector import PotholeDetector
+from .utils.video_processor import start_video_stream, stop_video_stream, get_stream_status, get_all_streams_status
+from .utils.frame_queue import add_frame_processing_task, get_task_status, get_queue_stats
 
 # Initialize detector
 detector = PotholeDetector()
@@ -224,7 +226,28 @@ class PotholeViewSet(viewsets.ModelViewSet):
                 
                 pothole_records = []
                 if detections:
-                    # User only wants to store if detection occurs
+                    # If userId is missing but deviceId is present, infer user from device owner
+                    device_obj = validated_data.get('deviceId')
+                    user_obj = validated_data.get('userId')
+                    if user_obj is None and device_obj is not None:
+                        try:
+                            user_obj = device_obj.owner
+                        except Exception:
+                            user_obj = None
+
+                    # If we still don't have required FKs, don't attempt DB writes (avoid 500)
+                    if device_obj is None or user_obj is None:
+                        return Response({
+                            "status": "success",
+                            "message": (
+                                f"Detection complete. {len(detections)} pothole(s) found, but not recorded "
+                                "because deviceId/userId is missing."
+                            ),
+                            "detection_count": len(detections),
+                            "potholes": []
+                        }, status=status.HTTP_200_OK)
+
+                    # Store detections
                     for det in detections:
                         # Prepare the annotated image for saving
                         pothole_image = photo
@@ -232,8 +255,8 @@ class PotholeViewSet(viewsets.ModelViewSet):
                             pothole_image = ContentFile(annotated_image_bytes, name=photo.name)
                         
                         pothole = Pothole.objects.create(
-                            device=validated_data.get('deviceId'),
-                            user=validated_data.get('userId'),
+                            device=device_obj,
+                            user=user_obj,
                             depth=det['depth'],
                             severity=det['severity'],
                             image=pothole_image, # Store the annotated image
@@ -383,3 +406,199 @@ class LoginView(APIView):
             "message": "Validation failed",
             "errors": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VideoStreamView(APIView):
+    """
+    API View for managing video streaming and frame capture
+    """
+    
+    @extend_schema(
+        description="Start video streaming from a URL",
+        tags=['Video Streaming'],
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'stream_id': {'type': 'string', 'description': 'Unique identifier for the stream'},
+                    'video_url': {'type': 'string', 'description': 'RTSP or HTTP video stream URL'},
+                    'device_id': {'type': 'integer', 'description': 'Optional device ID for tracking'},
+                    'frame_interval': {'type': 'integer', 'default': 30, 'description': 'Seconds between frame captures'}
+                },
+                'required': ['stream_id', 'video_url']
+            }
+        },
+        responses={
+            200: {'type': 'object', 'properties': {'status': {'type': 'string'}, 'message': {'type': 'string'}, 'stream_id': {'type': 'string'}}},
+            400: {'type': 'object', 'properties': {'status': {'type': 'string'}, 'message': {'type': 'string'}}},
+        }
+    )
+    def post(self, request):
+        """Start video streaming"""
+        stream_id = request.data.get('stream_id')
+        video_url = request.data.get('video_url')
+        device_id = request.data.get('device_id')
+        frame_interval = request.data.get('frame_interval', 30)
+        
+        if not stream_id or not video_url:
+            return Response({
+                "status": "error",
+                "message": "stream_id and video_url are required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate frame_interval
+        if not isinstance(frame_interval, int) or frame_interval < 1:
+            return Response({
+                "status": "error",
+                "message": "frame_interval must be a positive integer"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            detection_api_url = request.build_absolute_uri('/api/v1/potholes/upload-image/')
+            success = start_video_stream(stream_id, video_url, detection_api_url, frame_interval, device_id)
+            if success:
+                return Response({
+                    "status": "success",
+                    "message": f"Video streaming started for stream {stream_id}",
+                    "stream_id": stream_id
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "status": "error",
+                    "message": f"Stream {stream_id} is already running or failed to start"
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            return Response({
+                "status": "error",
+                "message": f"Error starting video stream: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @extend_schema(
+        description="Stop video streaming",
+        tags=['Video Streaming'],
+        parameters=[OpenApiParameter(name='stream_id', location=OpenApiParameter.PATH, type=str, description='Stream ID to stop')],
+        responses={
+            200: {'type': 'object', 'properties': {'status': {'type': 'string'}, 'message': {'type': 'string'}}},
+            404: {'type': 'object', 'properties': {'status': {'type': 'string'}, 'message': {'type': 'string'}}},
+        }
+    )
+    def delete(self, request, stream_id=None):
+        """Stop video streaming"""
+        if not stream_id:
+            return Response({
+                "status": "error",
+                "message": "stream_id is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            success = stop_video_stream(stream_id)
+            if success:
+                return Response({
+                    "status": "success",
+                    "message": f"Video streaming stopped for stream {stream_id}"
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "status": "error",
+                    "message": f"Stream {stream_id} is not active"
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            return Response({
+                "status": "error",
+                "message": f"Error stopping video stream: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class VideoStreamStatusView(APIView):
+    """
+    API View for getting video streaming status
+    """
+    
+    @extend_schema(
+        description="Get status of all video streams",
+        tags=['Video Streaming']
+    )
+    def get(self, request):
+        """Get status of all streams or specific stream"""
+        stream_id = request.query_params.get('stream_id')
+        
+        try:
+            if stream_id:
+                stream_status = get_stream_status(stream_id)
+                if stream_status:
+                    return Response({
+                        "status": "success",
+                        "data": stream_status
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "status": "error",
+                        "message": f"Stream {stream_id} not found"
+                    }, status=status.HTTP_404_NOT_FOUND)
+            else:
+                all_status = get_all_streams_status()
+                return Response({
+                    "status": "success",
+                    "data": all_status
+                }, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            return Response({
+                "status": "error",
+                "message": f"Error getting stream status: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class FrameProcessingView(APIView):
+    """
+    API View for frame processing queue management
+    """
+    
+    @extend_schema(
+        description="Get frame processing queue statistics",
+        tags=['Frame Processing'],
+        responses={
+            200: {'type': 'object', 'properties': {
+                'status': {'type': 'string'},
+                'data': {'type': 'object'}
+            }}
+        }
+    )
+    def get(self, request, task_id=None):
+        """Get queue statistics or task status"""
+        if task_id:
+            # Get specific task status
+            try:
+                task_status = get_task_status(task_id)
+                if task_status:
+                    return Response({
+                        "status": "success",
+                        "data": task_status
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "status": "error",
+                        "message": f"Task {task_id} not found"
+                    }, status=status.HTTP_404_NOT_FOUND)
+                        
+            except Exception as e:
+                return Response({
+                    "status": "error",
+                    "message": f"Error getting task status: {str(e)}"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # Get queue statistics
+            try:
+                queue_stats = get_queue_stats()
+                return Response({
+                    "status": "success",
+                    "data": queue_stats
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                return Response({
+                    "status": "error",
+                    "message": f"Error getting queue stats: {str(e)}"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
