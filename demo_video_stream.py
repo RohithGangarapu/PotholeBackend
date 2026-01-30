@@ -79,12 +79,20 @@ def monitor_stream(stream_id, duration=30):
                 frames = data['frames_processed']
                 frames_delta = frames - last_frames_processed
                 
+                conn = data.get('connection_active')
+                last_error = data.get('last_error')
+                
                 print(f"\r⏱️  [{elapsed}s]", end="")
                 print(f" 🎥 {frames} frames processed", end="")
                 print(f" ✅ {data['frames_sent']} sent", end="")
                 print(f" ❌ {data['frames_failed']} failed", end="")
+                print(f" 🔌 {'OK' if conn else 'DOWN'}", end="")
                 print(f" ⚙️  {queue_data['active_workers']} workers", end="")
                 print(f" 📦 Q:{queue_data['queue_size']}", end="", flush=True)
+
+                if last_error and not conn:
+                    # Print the error on a new line so it doesn't get overwritten by the status line.
+                    print(f"\n   ⚠️  last_error: {last_error}")
                 
                 last_frames_processed = frames
                 

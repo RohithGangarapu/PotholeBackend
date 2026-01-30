@@ -437,6 +437,8 @@ class VideoStreamView(APIView):
         """Start video streaming"""
         stream_id = request.data.get('stream_id')
         video_url = request.data.get('video_url')
+        if isinstance(video_url, str):
+            video_url = video_url.strip()
         device_id = request.data.get('device_id')
         frame_interval = request.data.get('frame_interval', 30)
         
@@ -455,18 +457,18 @@ class VideoStreamView(APIView):
         
         try:
             detection_api_url = request.build_absolute_uri('/api/v1/potholes/upload-image/')
-            success = start_video_stream(stream_id, video_url, detection_api_url, frame_interval, device_id)
+            success, err = start_video_stream(stream_id, video_url, detection_api_url, frame_interval, device_id)
             if success:
                 return Response({
                     "status": "success",
                     "message": f"Video streaming started for stream {stream_id}",
                     "stream_id": stream_id
                 }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    "status": "error",
-                    "message": f"Stream {stream_id} is already running or failed to start"
-                }, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({
+                "status": "error",
+                "message": err or f"Stream {stream_id} failed to start"
+            }, status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:
             return Response({

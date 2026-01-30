@@ -5,7 +5,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import cv2
@@ -30,6 +30,7 @@ def _is_probably_url(value: str) -> bool:
 
 def _resolve_video_source(video_source: str) -> str:
     """Resolve local relative paths (e.g. sample/sample.mp4) to an absolute path."""
+    video_source = (video_source or "").strip()
     if _is_probably_url(video_source):
         return video_source
 
@@ -92,6 +93,21 @@ class VideoStreamProcessor:
 
         # Ensure background workers are running
         init_frame_queue()
+
+        # Fail fast if OpenCV can't open the source.
+        # This avoids returning "success" from the API while the background thread immediately errors.
+        test_cap = cv2.VideoCapture(self.video_source)
+        try:
+            if not test_cap.isOpened():
+                self.connection_active = False
+                self._set_error(f"Failed to open video source: {self.video_source}")
+                logger.error(self._stats.last_error)
+                return False
+        finally:
+            try:
+                test_cap.release()
+            except Exception:
+                pass
 
         self.is_running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
@@ -289,12 +305,16 @@ def start_video_stream(
     frame_interval: int = 30,
     device_id: Optional[int] = None,
     user_id: Optional[int] = None,
-) -> bool:
-    """Start a video stream processing worker in the background."""
+) -> Tuple[bool, Optional[str]]:
+    """Start a video stream processing worker in the background.
+
+    Returns (success, error_message).
+    """
     with _stream_lock:
         if stream_id in _active_streams:
-            logger.warning("Stream %s is already running", stream_id)
-            return False
+            msg = f"Stream {stream_id} is already running"
+            logger.warning(msg)
+            return False, msg
 
         processor = VideoStreamProcessor(
             stream_id=stream_id,
@@ -307,9 +327,11 @@ def start_video_stream(
 
         if processor.start():
             _active_streams[stream_id] = processor
-            return True
+            return True, None
 
-        return False
+        # processor.start() will set last_error.
+        err = processor.get_status().get("last_error") or "Failed to start stream"
+        return False, err
 
 
 def stop_video_stream(stream_id: str) -> bool:
