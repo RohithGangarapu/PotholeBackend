@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
-
+import numpy as np
 import cv2
 import requests
 
@@ -245,67 +245,68 @@ class VideoStreamProcessor:
                 pass
 
     def _mjpeg_capture_loop(self) -> bool:
-        """Capture loop specifically for multipart/x-mixed-replace MJPEG streams."""
+        """
+        Robust MJPEG reader for ESP8266 / ESP32-CAM streams
+        """
         try:
-            resp = requests.get(self.video_source, stream=True, timeout=10)
-            if resp.status_code != 200:
-                self._set_error(f"HTTP {resp.status_code} from {self.video_source}")
-                return False
+            headers = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "multipart/x-mixed-replace"
+            }
 
-            # Some ESP32-CAM firmware doesn't send the multipart header correctly, 
-            # so we'll try to parse it anyway if the status is 200.
-            content_type = resp.headers.get('Content-Type', '').lower()
-            if 'multipart' not in content_type and 'image/jpeg' not in content_type:
-                logger.debug("Stream %s: Unusual Content-Type '%s', attempting parse anyway", self.stream_id, content_type)
+            resp = requests.get(
+                self.video_source,
+                stream=True,
+                timeout=(5, None),   # IMPORTANT: no read timeout
+                headers=headers
+            )
+
+            if resp.status_code != 200:
+                self._set_error(f"HTTP {resp.status_code}")
+                return False
 
             self.connection_active = True
             last_sample_wall = 0.0
-            byte_stream = bytes()
-            
-            # Max buffer size to prevent memory leaks if markers are missing (10MB)
-            MAX_BUFFER_SIZE = 10 * 1024 * 1024
 
-            # Iterate over the response stream
-            for chunk in resp.iter_content(chunk_size=4096):
+            buffer = bytearray()
+            MAX_BUFFER = 5 * 1024 * 1024  # 5MB safety
+
+            for chunk in resp.iter_content(chunk_size=1024):
                 if not self.is_running:
                     break
 
-                byte_stream += chunk
-                
-                # Check for buffer overflow
-                if len(byte_stream) > MAX_BUFFER_SIZE:
-                    logger.warning("Stream %s: MJPEG buffer overflow, clearing", self.stream_id)
-                    byte_stream = bytes()
+                buffer.extend(chunk)
+
+                if len(buffer) > MAX_BUFFER:
+                    buffer.clear()
                     continue
 
-                # Search for JPEG start and end markers
-                a = byte_stream.find(b'\xff\xd8') # JPEG start
-                b = byte_stream.find(b'\xff\xd9') # JPEG end
-                
-                if a != -1 and b != -1 and b > a:
-                    jpg_data = byte_stream[a:b+2]
-                    # Keep the remainder
-                    byte_stream = byte_stream[b+2:]
-                    
+                # JPEG markers
+                start = buffer.find(b'\xff\xd8')
+                end = buffer.find(b'\xff\xd9')
+
+                if start != -1 and end != -1 and end > start:
+                    jpg = buffer[start:end + 2]
+                    del buffer[:end + 2]
+
                     now = time.time()
-                    with self._stats_lock:
-                        self._stats.last_frame_time = now
+                    self._stats.last_frame_time = now
 
                     if (now - last_sample_wall) >= self.frame_interval:
-                        # Convert to OpenCV frame for processing
-                        frame = cv2.imdecode(cv2.frombuffer(jpg_data, dtype=cv2.uint8), cv2.IMREAD_COLOR)
+                        frame = cv2.imdecode(
+                            np.frombuffer(jpg, dtype=np.uint8),
+                            cv2.IMREAD_COLOR
+                        )
+
                         if frame is not None:
                             self._enqueue_detection(frame, now)
                             last_sample_wall = now
-                        else:
-                            logger.warning("Stream %s: Failed to decode JPEG frame", self.stream_id)
 
             return True
 
         except Exception as e:
-            msg = f"MJPEG capture error: {str(e)}"
-            self._set_error(msg)
-            logger.debug("Stream %s: %s", self.stream_id, msg)
+            self._set_error(str(e))
+            logger.exception("MJPEG capture failed")
             return False
         finally:
             self.connection_active = False
