@@ -150,9 +150,11 @@ class VideoStreamProcessor:
         is_http = self.video_source.startswith(("http://", "https://"))
         
         if is_http:
-            # Try MJPEG first for HTTP sources as OpenCV's MJPEG support can be flaky with ESP32-CAM
+            logger.info("Stream %s: Attempting MJPEG capture for HTTP source", self.stream_id)
             if self._mjpeg_capture_loop():
+                logger.info("Stream %s: MJPEG capture loop exited normally", self.stream_id)
                 return
+            logger.warning("Stream %s: MJPEG capture failed, falling back to OpenCV", self.stream_id)
 
         # Fallback to OpenCV (handles local files, RTSP, and some HTTP MJPEG)
         self._opencv_capture_loop()
@@ -246,26 +248,43 @@ class VideoStreamProcessor:
         """Capture loop specifically for multipart/x-mixed-replace MJPEG streams."""
         try:
             resp = requests.get(self.video_source, stream=True, timeout=10)
-            if resp.status_code != 200 or 'multipart/x-mixed-replace' not in resp.headers.get('Content-Type', ''):
+            if resp.status_code != 200:
+                self._set_error(f"HTTP {resp.status_code} from {self.video_source}")
                 return False
+
+            # Some ESP32-CAM firmware doesn't send the multipart header correctly, 
+            # so we'll try to parse it anyway if the status is 200.
+            content_type = resp.headers.get('Content-Type', '').lower()
+            if 'multipart' not in content_type and 'image/jpeg' not in content_type:
+                logger.debug("Stream %s: Unusual Content-Type '%s', attempting parse anyway", self.stream_id, content_type)
 
             self.connection_active = True
             last_sample_wall = 0.0
             byte_stream = bytes()
+            
+            # Max buffer size to prevent memory leaks if markers are missing (10MB)
+            MAX_BUFFER_SIZE = 10 * 1024 * 1024
 
             # Iterate over the response stream
-            for chunk in resp.iter_content(chunk_size=1024):
+            for chunk in resp.iter_content(chunk_size=4096):
                 if not self.is_running:
                     break
 
                 byte_stream += chunk
                 
+                # Check for buffer overflow
+                if len(byte_stream) > MAX_BUFFER_SIZE:
+                    logger.warning("Stream %s: MJPEG buffer overflow, clearing", self.stream_id)
+                    byte_stream = bytes()
+                    continue
+
                 # Search for JPEG start and end markers
                 a = byte_stream.find(b'\xff\xd8') # JPEG start
                 b = byte_stream.find(b'\xff\xd9') # JPEG end
                 
-                if a != -1 and b != -1:
+                if a != -1 and b != -1 and b > a:
                     jpg_data = byte_stream[a:b+2]
+                    # Keep the remainder
                     byte_stream = byte_stream[b+2:]
                     
                     now = time.time()
@@ -278,11 +297,15 @@ class VideoStreamProcessor:
                         if frame is not None:
                             self._enqueue_detection(frame, now)
                             last_sample_wall = now
+                        else:
+                            logger.warning("Stream %s: Failed to decode JPEG frame", self.stream_id)
 
             return True
 
         except Exception as e:
-            logger.debug("MJPEG capture failed or not supported: %s", str(e))
+            msg = f"MJPEG capture error: {str(e)}"
+            self._set_error(msg)
+            logger.debug("Stream %s: %s", self.stream_id, msg)
             return False
         finally:
             self.connection_active = False
