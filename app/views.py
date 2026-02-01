@@ -423,6 +423,7 @@ class VideoStreamView(APIView):
                     'stream_id': {'type': 'string', 'description': 'Unique identifier for the stream'},
                     'video_url': {'type': 'string', 'description': 'RTSP or HTTP video stream URL'},
                     'device_id': {'type': 'integer', 'description': 'Optional device ID for tracking'},
+                    'user_id': {'type': 'integer', 'description': 'Optional user ID for tracking'},
                     'frame_interval': {'type': 'integer', 'default': 30, 'description': 'Seconds between frame captures'}
                 },
                 'required': ['stream_id', 'video_url']
@@ -440,6 +441,7 @@ class VideoStreamView(APIView):
         if isinstance(video_url, str):
             video_url = video_url.strip()
         device_id = request.data.get('device_id')
+        user_id = request.data.get('user_id')
         frame_interval = request.data.get('frame_interval', 30)
         
         if not stream_id or not video_url:
@@ -457,7 +459,7 @@ class VideoStreamView(APIView):
         
         try:
             detection_api_url = request.build_absolute_uri('/api/v1/potholes/upload-image/')
-            success, err = start_video_stream(stream_id, video_url, detection_api_url, frame_interval, device_id)
+            success, err_msg = start_video_stream(stream_id, video_url, detection_api_url, frame_interval, device_id, user_id)
             if success:
                 return Response({
                     "status": "success",
@@ -467,7 +469,7 @@ class VideoStreamView(APIView):
 
             return Response({
                 "status": "error",
-                "message": err or f"Stream {stream_id} failed to start"
+                "message": err_msg or f"Stream {stream_id} failed to start"
             }, status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:

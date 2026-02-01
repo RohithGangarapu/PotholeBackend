@@ -145,6 +145,19 @@ class VideoStreamProcessor:
             self._stats.last_error = msg
 
     def _capture_loop(self) -> None:
+        """Main capture loop that tries OpenCV first, then falls back to MJPEG if needed."""
+        # If it's an HTTP/HTTPS URL, it's very likely an MJPEG stream for these IoT devices
+        is_http = self.video_source.startswith(("http://", "https://"))
+        
+        if is_http:
+            # Try MJPEG first for HTTP sources as OpenCV's MJPEG support can be flaky with ESP32-CAM
+            if self._mjpeg_capture_loop():
+                return
+
+        # Fallback to OpenCV (handles local files, RTSP, and some HTTP MJPEG)
+        self._opencv_capture_loop()
+
+    def _opencv_capture_loop(self) -> None:
         cap: Optional[cv2.VideoCapture] = None
         try:
             cap = cv2.VideoCapture(self.video_source)
@@ -221,14 +234,57 @@ class VideoStreamProcessor:
         except Exception as e:
             self.connection_active = False
             self._set_error(str(e))
-            logger.exception("Error in stream processing for %s", self.stream_id)
+            logger.exception("Error in OpenCV capture loop for %s", self.stream_id)
         finally:
             try:
                 if cap is not None:
                     cap.release()
             except Exception:
                 pass
-            self.is_running = False
+
+    def _mjpeg_capture_loop(self) -> bool:
+        """Capture loop specifically for multipart/x-mixed-replace MJPEG streams."""
+        try:
+            resp = requests.get(self.video_source, stream=True, timeout=10)
+            if resp.status_code != 200 or 'multipart/x-mixed-replace' not in resp.headers.get('Content-Type', ''):
+                return False
+
+            self.connection_active = True
+            last_sample_wall = 0.0
+            byte_stream = bytes()
+
+            # Iterate over the response stream
+            for chunk in resp.iter_content(chunk_size=1024):
+                if not self.is_running:
+                    break
+
+                byte_stream += chunk
+                
+                # Search for JPEG start and end markers
+                a = byte_stream.find(b'\xff\xd8') # JPEG start
+                b = byte_stream.find(b'\xff\xd9') # JPEG end
+                
+                if a != -1 and b != -1:
+                    jpg_data = byte_stream[a:b+2]
+                    byte_stream = byte_stream[b+2:]
+                    
+                    now = time.time()
+                    with self._stats_lock:
+                        self._stats.last_frame_time = now
+
+                    if (now - last_sample_wall) >= self.frame_interval:
+                        # Convert to OpenCV frame for processing
+                        frame = cv2.imdecode(cv2.frombuffer(jpg_data, dtype=cv2.uint8), cv2.IMREAD_COLOR)
+                        if frame is not None:
+                            self._enqueue_detection(frame, now)
+                            last_sample_wall = now
+
+            return True
+
+        except Exception as e:
+            logger.debug("MJPEG capture failed or not supported: %s", str(e))
+            return False
+        finally:
             self.connection_active = False
 
     def _enqueue_detection(self, frame, sample_time: float) -> None:
