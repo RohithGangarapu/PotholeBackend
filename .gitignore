@@ -56,3 +56,4 @@ venv.bak/
 .coverage
 htmlcov/
 .pytest_cache/
+myapp.tar
