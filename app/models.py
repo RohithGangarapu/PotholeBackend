@@ -45,6 +45,11 @@ class IOTDevice(models.Model):
     registered_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='registered_devices', help_text="Admin/owner who registered device")
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_devices', help_text="User ID of device owner")
     
+    # Live tracking fields
+    last_latitude = models.FloatField(default=0.0, validators=[MinValueValidator(-90.0), MaxValueValidator(90.0)])
+    last_longitude = models.FloatField(default=0.0, validators=[MinValueValidator(-180.0), MaxValueValidator(180.0)])
+    esp_ip = models.GenericIPAddressField(blank=True, null=True, help_text="Current IP of the ESP8266/ESP32")
+    
     class Meta:
         db_table = 'iot_devices'
         verbose_name = 'IOT Device'

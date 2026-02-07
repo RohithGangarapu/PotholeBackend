@@ -57,12 +57,16 @@ class IOTDeviceSerializer(serializers.ModelSerializer):
     registeredAt = serializers.DateTimeField(source='registered_at', read_only=True)
     registeredBy = serializers.PrimaryKeyRelatedField(source='registered_by', queryset=User.objects.all())
     ownerId = serializers.PrimaryKeyRelatedField(source='owner', queryset=User.objects.all())
+    lastLatitude = serializers.FloatField(source='last_latitude', read_only=True)
+    lastLongitude = serializers.FloatField(source='last_longitude', read_only=True)
+    espIp = serializers.IPAddressField(source='esp_ip', read_only=True)
     
     class Meta:
         model = IOTDevice
         fields = [
             'id', 'deviceType', 'macId', 'status',
-            'registeredAt', 'registeredBy', 'ownerId'
+            'registeredAt', 'registeredBy', 'ownerId',
+            'lastLatitude', 'lastLongitude', 'espIp'
         ]
         read_only_fields = ['id', 'registeredAt']
     

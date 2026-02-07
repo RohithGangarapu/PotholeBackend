@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth.hashers import check_password
+from django.views.generic import TemplateView
+import requests
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from datetime import datetime
 
@@ -606,3 +608,95 @@ class FrameProcessingView(APIView):
                     "status": "error",
                     "message": f"Error getting queue stats: {str(e)}"
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeviceControlProxyView(APIView):
+    """
+    API View that proxies control commands from the dashboard TO the ESP8266/ESP32.
+    This bypasses CORS issues and hides the device's direct IP from the client.
+    """
+    @extend_schema(
+        description="Send a movement command to the IoT device",
+        tags=['Device Control'],
+        parameters=[
+            OpenApiParameter(name='device_id', location=OpenApiParameter.PATH, type=int),
+            OpenApiParameter(name='command', location=OpenApiParameter.PATH, type=str, enum=['forward', 'back', 'left', 'right', 'stop'])
+        ]
+    )
+    def post(self, request, device_id, command):
+        try:
+            device = IOTDevice.objects.get(pk=device_id)
+        except IOTDevice.DoesNotExist:
+            return Response({"status": "error", "message": "Device not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not device.esp_ip:
+            return Response({"status": "error", "message": "Device IP not registered"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Map command to the car's endpoint (GET request per the car code)
+        target_url = f"http://{device.esp_ip}/{command}"
+        
+        try:
+            resp = requests.get(target_url, timeout=2)
+            return Response({
+                "status": "success",
+                "device_response": resp.text,
+                "command": command
+            })
+        except Exception as e:
+            return Response({
+                "status": "error",
+                "message": f"Failed to reach device at {device.esp_ip}: {str(e)}"
+            }, status=status.HTTP_502_BAD_GATEWAY)
+
+
+class DeviceGPSUpdateView(APIView):
+    """
+    API View for the IoT device to push its telemetry (GPS, IP) to the backend.
+    """
+    @extend_schema(
+        description="Update device telemetry (GPS and IP)",
+        tags=['Device Control'],
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'lat': {'type': 'number'},
+                    'lng': {'type': 'number'},
+                    'ip': {'type': 'string'}
+                }
+            }
+        }
+    )
+    def post(self, request, device_id):
+        try:
+            device = IOTDevice.objects.get(pk=device_id)
+        except IOTDevice.DoesNotExist:
+            return Response({"status": "error", "message": "Device not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        lat = request.data.get('lat')
+        lng = request.data.get('lng')
+        ip = request.data.get('ip')
+
+        if lat is not None: device.last_latitude = lat
+        if lng is not None: device.last_longitude = lng
+        if ip: device.esp_ip = ip
+        
+        device.save()
+
+        return Response({
+            "status": "success",
+            "message": "Location updated",
+            "lat": device.last_latitude,
+            "lng": device.last_longitude,
+            "ip": device.esp_ip
+        })
+
+
+class DashboardView(TemplateView):
+    template_name = "dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['devices'] = IOTDevice.objects.all()
+        context['latest_potholes'] = Pothole.objects.all().order_by('-detected_at')[:10]
+        return context

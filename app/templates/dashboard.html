@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pothole Detection - Command Center</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: rgba(30, 41, 59, 0.7);
+            --accent-primary: #38bdf8;
+            --accent-secondary: #818cf8;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Roboto', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 320px 1fr 320px;
+            grid-template-rows: 70px 1fr 300px;
+            gap: 15px;
+            padding: 15px;
+            height: 100vh;
+            grid-template-areas:
+                "header header header"
+                "left main right"
+                "left map right";
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        header {
+            grid-area: header;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .system-status {
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-pill {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-pill .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.7;
+            }
+
+            70% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.7;
+            }
+        }
+
+        .left-col {
+            grid-area: left;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .stream-viewport {
+            grid-area: main;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .map-viewport {
+            grid-area: map;
+            padding: 0 !important;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .right-col {
+            grid-area: right;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        /* Controls */
+        .control-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .control-btn {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            border: none;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            background: var(--accent-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .control-btn.stop {
+            background: var(--danger);
+            grid-column: 2;
+        }
+
+        .control-btn.stop:hover {
+            background: #dc2626;
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        /* Video Stream */
+        .video-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            background: #000;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #stream-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .detection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Map */
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+        }
+
+        /* Logs */
+        .log-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-left: 4px solid var(--accent-primary);
+        }
+
+        .log-item.high {
+            border-left-color: var(--danger);
+        }
+
+        .log-item.medium {
+            border-left-color: var(--warning);
+        }
+
+        .log-item.low {
+            border-left-color: var(--success);
+        }
+
+        .log-time {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .log-meta {
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+
+        /* Telemetry */
+        .telemetry-card {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            color: var(--accent-primary);
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+        }
+
+        .toast-notification {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-primary);
+            padding: 15px 25px;
+            border-radius: 10px;
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+
+            to {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <header class="glass-panel">
+            <div class="logo">
+                <i class="fa-solid fa-road-circle-exclamation"></i>
+                POTHOLE AI SENTINEL
+            </div>
+            <div class="system-status">
+                <div class="status-pill">
+                    <span class="pulse"></span>
+                    Car IP: <strong id="car-ip">Connecting...</strong>
+                </div>
+                <div class="status-pill">
+                    <i class="fa-solid fa-satellite"></i>
+                    GPS: <strong id="gps-status">Searching...</strong>
+                </div>
+            </div>
+        </header>
+
+        <aside class="left-col glass-panel">
+            <h3>Vehicle Info</h3>
+            <div style="margin-top: 15px; text-align: center;">
+                <i class="fa-solid fa-car-side"
+                    style="font-size: 4rem; color: var(--accent-primary); margin: 20px 0;"></i>
+                <h4>D3-Sentinel Rover v1</h4>
+            </div>
+
+            <div class="telemetry-card" style="margin-top: 20px;">
+                <div class="stat-box">
+                    <div class="stat-val" id="lat-val">0.0000</div>
+                    <div class="stat-label">Latitude</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="lng-val">0.0000</div>
+                    <div class="stat-label">Longitude</div>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 30px;">Manual Control</h3>
+            <div class="control-pad">
+                <button class="control-btn" onclick="sendCommand('forward')"><i
+                        class="fa-solid fa-chevron-up"></i></button>
+                <div style="grid-column: 2;"></div> <!-- Gap -->
+                <button class="control-btn" onclick="sendCommand('left')"><i
+                        class="fa-solid fa-chevron-left"></i></button>
+                <button class="control-btn stop" onclick="sendCommand('stop')"><i
+                        class="fa-solid fa-circle-stop"></i></button>
+                <button class="control-btn" onclick="sendCommand('right')"><i
+                        class="fa-solid fa-chevron-right"></i></button>
+                <button class="control-btn" onclick="sendCommand('back')"><i
+                        class="fa-solid fa-chevron-down"></i></button>
+            </div>
+
+            <div style="margin-top: auto; font-size: 0.7rem; color: var(--text-dim);">
+                <i class="fa-solid fa-circle-info"></i> Keyboard controls: WASD / Arrows
+            </div>
+        </aside>
+
+        <main class="stream-viewport glass-panel">
+            <div class="video-container">
+                <img id="stream-img" src="http://10.64.6.250/stream" alt="Car Stream"
+                    onerror="this.src='https://placehold.co/640x360/000000/38bdf8?text=NO+SIGNAL'">
+                <div class="detection-overlay" id="alerts-overlay"></div>
+            </div>
+            <div
+                style="position: absolute; top: 30px; left: 30px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 5px; font-family: 'Orbitron'; font-size: 0.8rem;">
+                LIVE FEED: ESP32-CAM
+            </div>
+        </main>
+
+        <section class="map-viewport glass-panel">
+            <div id="map"></div>
+        </section>
+
+        <aside class="right-col glass-panel">
+            <h3>Detection Log</h3>
+            <div id="detection-logs" style="margin-top: 15px;">
+                {% for p in latest_potholes %}
+                <div class="log-item {{ p.severity }}">
+                    <div class="log-time">{{ p.detected_at|date:"H:i:s" }} - {{ p.severity|upper }}</div>
+                    <div>Pothole detected ({{ p.depth }}cm)</div>
+                    <div class="log-meta">
+                        <span><i class="fa-solid fa-location-dot"></i> {{ p.latitude|floatformat:4 }}, {{
+                            p.longitude|floatformat:4 }}</span>
+                    </div>
+                </div>
+                {% empty %}
+                <div style="text-align: center; color: var(--text-dim); margin-top: 50px;">
+                    <i class="fa-solid fa-shield-check" style="font-size: 3rem; opacity: 0.2;"></i>
+                    <p>No threats detected</p>
+                </div>
+                {% endfor %}
+            </div>
+        </aside>
+    </div>
+
+    <div id="toast" class="toast-notification"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Use device ID 1 for testing
+        const DEVICE_ID = 1;
+
+        // Initialize Map
+        const map = L.map('map').setView([17.3850, 78.4867], 15);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        const carIcon = L.divIcon({
+            html: '<i class="fa-solid fa-car-side" style="color: #38bdf8; font-size: 24px;"></i>',
+            className: 'custom-div-icon',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        const carMarker = L.marker([17.3850, 78.4867], { icon: carIcon }).addTo(map);
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.display = 'block';
+            setTimeout(() => { t.style.display = 'none'; }, 3000);
+        }
+
+        async function sendCommand(cmd) {
+            console.log("Sending command:", cmd);
+            try {
+                const response = await fetch(`/api/v1/devices/${DEVICE_ID}/control/${cmd}/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showToast(`Command ${cmd} sent!`);
+                } else {
+                    showToast(`Error: ${data.message}`);
+                }
+            } catch (err) {
+                showToast("Request failed");
+            }
+        }
+
+        // Telemetry Polling
+        async function updateTelemetry() {
+            try {
+                const response = await fetch(`/api/v1/devices/${DEVICE_ID}/`);
+                const data = await response.json();
+                if (data.status === 'success') {
+                    const dev = data.data;
+                    if (dev.lastLatitude != null && dev.lastLongitude != null) {
+                        const newPos = [dev.lastLatitude, dev.lastLongitude];
+                        carMarker.setLatLng(newPos);
+                        map.panTo(newPos);
+                        document.getElementById('lat-val').innerText = dev.lastLatitude.toFixed(4);
+                        document.getElementById('lng-val').innerText = dev.lastLongitude.toFixed(4);
+                        document.getElementById('gps-status').innerText = 'Locked';
+                    }
+                    if (dev.espIp) {
+                        document.getElementById('car-ip').innerText = dev.espIp;
+                    }
+                }
+            } catch (err) {
+                console.error("Telemetry update failed", err);
+            }
+        }
+
+        setInterval(updateTelemetry, 3000);
+
+        // Keyboard support
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key === 'w' || key === 'arrowup') sendCommand('forward');
+            if (key === 's' || key === 'arrowdown') sendCommand('back');
+            if (key === 'a' || key === 'arrowleft') sendCommand('left');
+            if (key === 'd' || key === 'arrowright') sendCommand('right');
+            if (key === ' ') sendCommand('stop');
+        });
+    </script>
+</body>
+
+</html>

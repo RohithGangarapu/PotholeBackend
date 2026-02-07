@@ -8,7 +8,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     UserViewSet, IOTDeviceViewSet, PotholeViewSet, AlertViewSet, LoginView,
-    VideoStreamView, VideoStreamStatusView, FrameProcessingView
+    VideoStreamView, VideoStreamStatusView, FrameProcessingView,
+    DeviceControlProxyView, DeviceGPSUpdateView, DashboardView
 )
 
 # Create router and register ViewSets
@@ -28,6 +29,11 @@ urlpatterns = [
     # Frame processing endpoints
     path('frame-processing/', FrameProcessingView.as_view(), name='frame-processing-stats'),
     path('frame-processing/<str:task_id>/', FrameProcessingView.as_view(), name='frame-processing-task'),
+    # Device Control and GPS
+    path('devices/<int:device_id>/control/<str:command>/', DeviceControlProxyView.as_view(), name='device-control'),
+    path('devices/<int:device_id>/gps/', DeviceGPSUpdateView.as_view(), name='device-gps-update'),
+    # Dashboard (also accessible as /dashboard/ via top-level)
+    path('dashboard/', DashboardView.as_view(), name='dashboard'),
     # Router URLs
     path('', include(router.urls)),
 ]

@@ -270,38 +270,70 @@ class VideoStreamProcessor:
 
             buffer = bytearray()
             MAX_BUFFER = 5 * 1024 * 1024  # 5MB safety
+            
+            resp_iter = resp.iter_content(chunk_size=4096)
 
-            for chunk in resp.iter_content(chunk_size=1024):
-                if not self.is_running:
+            while self.is_running:
+                try:
+                    chunk = next(resp_iter, None)
+                    if chunk is None:
+                        break
+                except StopIteration:
+                    break
+                except Exception as e:
+                    logger.error("Stream %s: Chunk read error: %s", self.stream_id, str(e))
                     break
 
                 buffer.extend(chunk)
 
                 if len(buffer) > MAX_BUFFER:
+                    logger.warning("Stream %s: Buffer overflow, clearing", self.stream_id)
                     buffer.clear()
                     continue
 
-                # JPEG markers
-                start = buffer.find(b'\xff\xd8')
-                end = buffer.find(b'\xff\xd9')
-
-                if start != -1 and end != -1 and end > start:
-                    jpg = buffer[start:end + 2]
+                while True:
+                    # Find start of JPEG
+                    start = buffer.find(b'\xff\xd8')
+                    if start == -1:
+                        # Keep only the last byte if it might be start of a marker
+                        if len(buffer) > 0:
+                            last_byte = buffer[-1:]
+                            buffer.clear()
+                            if last_byte == b'\xff':
+                                buffer.extend(last_byte)
+                        break
+                    
+                    # Discard anything before the start marker
+                    if start > 0:
+                        del buffer[:start]
+                    
+                    # Find end of JPEG (start searching from after the start marker)
+                    end = buffer.find(b'\xff\xd9', 2)
+                    if end == -1:
+                        # Need more data for a full frame
+                        break
+                    
+                    # Extract full frame
+                    jpg_data = buffer[:end + 2]
                     del buffer[:end + 2]
-
+                    
                     now = time.time()
                     self._stats.last_frame_time = now
 
+                    # Only process at the specified interval
                     if (now - last_sample_wall) >= self.frame_interval:
-                        frame = cv2.imdecode(
-                            np.frombuffer(jpg, dtype=np.uint8),
-                            cv2.IMREAD_COLOR
-                        )
+                        try:
+                            frame = cv2.imdecode(
+                                np.frombuffer(jpg_data, dtype=np.uint8),
+                                cv2.IMREAD_COLOR
+                            )
 
-                        if frame is not None:
-                            self._enqueue_detection(frame, now)
-                            last_sample_wall = now
-
+                            if frame is not None:
+                                self._enqueue_detection(frame, now)
+                                last_sample_wall = now
+                        except Exception as e:
+                            logger.error("Stream %s: Decode error: %s", self.stream_id, str(e))
+                            
             return True
 
         except Exception as e:

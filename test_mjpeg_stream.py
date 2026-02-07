@@ -62,6 +62,38 @@ def stop_stream(stream_id):
     except Exception as e:
         print(f"❌ Error: {str(e)}")
 
+def test_telemetry(device_id):
+    print(f"\n📡 Testing Telemetry (GPS Update) for Device {device_id}...")
+    payload = {
+        "lat": 17.3850,
+        "lng": 78.4867,
+        "ip": "10.64.6.250"
+    }
+    try:
+        resp = requests.post(f"{BASE_URL}/devices/{device_id}/gps/", json=payload, timeout=5)
+        if resp.status_code == 200:
+            print(f"✅ GPS Updated: {resp.json().get('message')}")
+        else:
+            print(f"❌ GPS Error {resp.status_code}: {resp.json()}")
+    except Exception as e:
+        print(f"❌ GPS Connection Error: {str(e)}")
+
+def test_controls(device_id):
+    print(f"\n🎮 Testing Commands for Device {device_id}...")
+    commands = ["forward", "stop"]
+    for cmd in commands:
+        try:
+            print(f"   Sending '{cmd}'...", end="", flush=True)
+            # Note: This will likely fail in test if the actual ESP is not reachable
+            resp = requests.post(f"{BASE_URL}/devices/{device_id}/control/{cmd}/", timeout=5)
+            if resp.status_code in [200, 502]: 
+                status_icon = "✅" if resp.status_code == 200 else "⚠️ (Proxy OK, Device Offline)"
+                print(f" {status_icon}")
+            else:
+                print(f" ❌ Error {resp.status_code}")
+        except Exception as e:
+            print(f" ❌ Error: {str(e)}")
+
 def main():
     parser = argparse.ArgumentParser(description="Test MJPEG Stream Capture")
     parser.add_argument("--url", default="http://10.64.6.250/stream", help="Stream URL")
@@ -76,6 +108,10 @@ def main():
         time.sleep(2)
         monitor_status(args.id)
         stop_stream(args.id)
+        
+        # Test the new integration endpoints
+        test_telemetry(args.device)
+        test_controls(args.device)
 
 if __name__ == "__main__":
     main()
