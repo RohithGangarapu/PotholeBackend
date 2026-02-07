@@ -14,15 +14,32 @@ class PotholeDetector:
         self.call_url = f"{self.space_url}/gradio_api/call/predict"
 
     def _upload_file(self, file_path):
-        """Uploads a local file to Gradio's temp storage and returns the remote path."""
         try:
-            with open(file_path, "rb") as f:
-                files = {"files": (os.path.basename(file_path), f)}
-                response = requests.post(self.upload_url, files=files, timeout=30)
-                if response.status_code == 200:
-                    return response.json()[0]
+            img = cv2.imread(file_path)
+            if img is None:
+                return None
+
+            # 🔥 Resize before upload (CRITICAL)
+            img = cv2.resize(img, (640, 480))
+
+            _, buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 75])
+
+            files = {
+                "files": ("frame.jpg", buffer.tobytes(), "image/jpeg")
+            }
+
+            response = requests.post(
+                self.upload_url,
+                files=files,
+                timeout=60   # ⬆ increased
+            )
+
+            if response.status_code == 200:
+                return response.json()[0]
+
         except Exception as e:
             print(f"File upload failed: {e}")
+
         return None
 
     def detect(self, image_path):
